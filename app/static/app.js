@@ -33,17 +33,49 @@ document.addEventListener("DOMContentLoaded", () => {
   let conversationHistory = [];
 
   // 1. Initialize configuration from LocalStorage
-  function loadSettings() {
+  async function loadSettings() {
     const savedGeminiKey = localStorage.getItem("gemini_api_key") || "";
     const savedFredKey = localStorage.getItem("fred_api_key") || "";
     const savedModel = localStorage.getItem("selected_model") || "gemini-2.5-flash";
 
     geminiKeyInput.value = savedGeminiKey;
     fredKeyInput.value = savedFredKey;
-    modelSelect.value = savedModel;
     modelBadge.textContent = savedModel;
 
+    await refreshAvailableModels();
     updateStatusBadges();
+  }
+
+  async function refreshAvailableModels() {
+    const userGeminiKey = localStorage.getItem("gemini_api_key") || geminiKeyInput.value.trim() || "";
+    try {
+      const url = userGeminiKey
+        ? `/api/gemini/models?gemini_api_key=${encodeURIComponent(userGeminiKey)}`
+        : "/api/gemini/models";
+      const res = await fetch(url);
+      const data = await res.json();
+      const models = data.models || [];
+      const savedModel = localStorage.getItem("selected_model") || "";
+
+      modelSelect.innerHTML = "";
+      models.forEach((m) => {
+        const opt = document.createElement("option");
+        opt.value = m.id;
+        opt.textContent = m.verified ? `✅ ${m.name}` : m.name;
+        opt.title = m.description || "";
+        if (m.id === savedModel) opt.selected = true;
+        modelSelect.appendChild(opt);
+      });
+
+      if (!modelSelect.value && models.length > 0) {
+        modelSelect.value = models[0].id;
+      }
+      if (modelSelect.value) {
+        modelBadge.textContent = modelSelect.value;
+      }
+    } catch (e) {
+      console.warn("Failed to load models:", e);
+    }
   }
 
   function saveSettings() {
@@ -106,6 +138,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       if (data.gemini_valid) {
         msg += `✅ Gemini: ${data.gemini_message}\n`;
+        await refreshAvailableModels();
       } else {
         msg += `⚠️ Gemini: ${data.gemini_message}\n`;
         allGood = false;
@@ -443,6 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Modal open/close
   openSettingsBtn.addEventListener("click", () => {
     testResultMsg.classList.add("hidden");
+    refreshAvailableModels();
     settingsModal.classList.add("open");
   });
 

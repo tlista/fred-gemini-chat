@@ -6,7 +6,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 
-from app.gemini_agent import FredGeminiAgent
+from app.gemini_agent import FredGeminiAgent, get_available_gemini_models_sync
 from app.fred_client import POPULAR_SERIES
 from app.models import ChatMessage
 
@@ -83,12 +83,31 @@ with st.sidebar:
         help="Get a free 32-character key from https://fred.stlouisfed.org/docs/api/api_key.html"
     )
 
+    # Confirm available Gemini models live before displaying options
+    with st.spinner("Checking available models..."):
+        available_models = get_available_gemini_models_sync(gemini_key)
+
+    is_verified = any(m.get("verified", False) for m in available_models)
+    model_ids = [m["id"] for m in available_models]
+
+    model_display_map = {m["id"]: m.get("name", m["id"]) for m in available_models}
+    model_desc_map = {m["id"]: m.get("description", "") for m in available_models}
+
     model_name = st.selectbox(
         "Gemini Model",
-        options=["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.5-pro", "gemini-1.5-pro"],
+        options=model_ids,
+        format_func=lambda mid: model_display_map.get(mid, mid),
         index=0,
-        help="gemini-2.5-flash is fast and recommended for tool orchestration."
+        help="Model options are verified live against your API key."
     )
+
+    if is_verified:
+        st.caption(f"✅ Verified {len(available_models)} models available for your key.")
+    else:
+        st.caption("💡 Enter Gemini key to confirm live models available for your account.")
+
+    if model_name in model_desc_map and model_desc_map[model_name]:
+        st.caption(f"ℹ️ {model_desc_map[model_name]}")
 
     # Status indicators
     st.divider()

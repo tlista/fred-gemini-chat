@@ -57,3 +57,14 @@ def test_chat_endpoint_demo():
     assert len(data["reply"]) > 0
     assert len(data["tool_calls"]) > 0
     assert len(data["charts"]) > 0
+
+
+def test_list_models_endpoint():
+    """Verify GET /api/gemini/models returns fallback or confirmed models."""
+    res = client.get("/api/gemini/models")
+    assert res.status_code == 200
+    data = res.json()
+    assert "models" in data
+    assert data["count"] > 0
+    ids = [m["id"] for m in data["models"]]
+    assert any("flash" in mid for mid in ids)

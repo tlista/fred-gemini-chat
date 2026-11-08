@@ -1,8 +1,10 @@
 """Gemini AI Agent with Federal Reserve Economic Data (FRED) Function Calling Tools."""
 
+import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
+import httpx
 from google import genai
 from google.genai import types
 
@@ -17,6 +19,117 @@ from app.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Standard fallback models when offline or no API key is set
+DEFAULT_MODELS: List[Dict[str, Any]] = [
+    {
+        "id": "gemini-2.5-flash",
+        "name": "Gemini 2.5 Flash (Recommended)",
+        "description": "High-efficiency multimodal model optimized for real-time tool orchestration",
+        "verified": False,
+    },
+    {
+        "id": "gemini-2.0-flash",
+        "name": "Gemini 2.0 Flash",
+        "description": "Next-generation fast model with tool use support",
+        "verified": False,
+    },
+    {
+        "id": "gemini-1.5-flash",
+        "name": "Gemini 1.5 Flash",
+        "description": "Fast and versatile performance across economic analysis tasks",
+        "verified": False,
+    },
+    {
+        "id": "gemini-2.5-pro",
+        "name": "Gemini 2.5 Pro",
+        "description": "High-intelligence model specialized for deep reasoning and complex economic synthesis",
+        "verified": False,
+    },
+    {
+        "id": "gemini-1.5-pro",
+        "name": "Gemini 1.5 Pro",
+        "description": "Advanced problem-solving across long historical documents and data",
+        "verified": False,
+    },
+]
+
+
+async def get_available_gemini_models(api_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Confirm available Gemini models by querying the live API for the user's specific key."""
+    key = (api_key or settings.GEMINI_API_KEY).strip()
+    if not key or len(key) < 15:
+        return DEFAULT_MODELS
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={key}"
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.get(url)
+            if res.status_code == 200:
+                data = res.json()
+                raw_models = data.get("models", [])
+                confirmed: List[Dict[str, Any]] = []
+
+                for m in raw_models:
+                    mid = m.get("name", "").replace("models/", "")
+                    display_name = m.get("displayName", mid)
+                    description = m.get("description", "")
+                    methods = m.get("supportedGenerationMethods", [])
+
+                    # Include only models that support content generation and are Gemini models
+                    if "generateContent" in methods and "gemini" in mid.lower():
+                        # Exclude embeddings, audio-only, or deprecated experimental snapshots where appropriate
+                        if "embedding" in mid.lower() or "aqa" in mid.lower():
+                            continue
+                        confirmed.append({
+                            "id": mid,
+                            "name": f"{display_name} ({mid})",
+                            "description": description[:120],
+                            "verified": True,
+                        })
+
+                if confirmed:
+                    # Sort so recommended flash models appear first, followed by pro models
+                    def _sort_key(item: Dict[str, Any]) -> int:
+                        item_id = item["id"].lower()
+                        score = 50
+                        if "2.5-flash" in item_id:
+                            score = 10
+                        elif "2.0-flash" in item_id:
+                            score = 20
+                        elif "1.5-flash" in item_id:
+                            score = 30
+                        elif "2.5-pro" in item_id:
+                            score = 40
+                        elif "1.5-pro" in item_id:
+                            score = 45
+                        elif "flash" in item_id:
+                            score = 35
+                        return score
+
+                    confirmed.sort(key=_sort_key)
+                    return confirmed
+            else:
+                logger.warning("Gemini models endpoint returned status %s", res.status_code)
+    except Exception as e:
+        logger.warning("Failed to query live Gemini models: %s", e)
+
+    return DEFAULT_MODELS
+
+
+def get_available_gemini_models_sync(api_key: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Synchronous helper for Streamlit or blocking contexts."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If in an active async event loop (like certain environments), run via thread
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(asyncio.run, get_available_gemini_models(api_key))
+                return future.result()
+        return loop.run_until_complete(get_available_gemini_models(api_key))
+    except Exception:
+        return asyncio.run(get_available_gemini_models(api_key))
 
 # System instructions for Gemini
 SYSTEM_INSTRUCTION = """You are an expert Macroeconomic and Financial Analyst powered by the Federal Reserve Bank of St. Louis Economic Data (FRED) API.

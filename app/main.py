@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
 from app.fred_client import FredClient, POPULAR_SERIES
-from app.gemini_agent import FredGeminiAgent
+from app.gemini_agent import FredGeminiAgent, get_available_gemini_models
 from app.models import (
     ChatRequest,
     ChatResponse,
@@ -52,6 +52,13 @@ async def health_check():
         "has_gemini_env_key": bool(settings.GEMINI_API_KEY),
         "has_fred_env_key": bool(settings.FRED_API_KEY)
     }
+
+
+@app.get("/api/gemini/models")
+async def list_available_models(gemini_api_key: Optional[str] = Query(None)):
+    """Fetch confirmed live Gemini models available for the provided key."""
+    models = await get_available_gemini_models(api_key=gemini_api_key)
+    return {"count": len(models), "models": models}
 
 
 @app.post("/api/chat", response_model=ChatResponse)
