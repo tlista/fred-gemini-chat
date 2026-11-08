@@ -50,6 +50,23 @@ Users can query real-time macroeconomic indicators, track inflation trends, comp
 
 ---
 
+## ☁️ Deploying on Streamlit Cloud (streamlit.io)
+
+You can host this chat app for free on **Streamlit Community Cloud**:
+
+1. Log in to [share.streamlit.io](https://share.streamlit.io) with your GitHub account.
+2. Click **Create app** (or **New app**).
+3. Select your repository: `tlista/fred-gemini-chat`.
+4. Main file path: `streamlit_app.py`.
+5. Under **Advanced settings** -> **Secrets** (optional, you can also enter keys in the UI sidebar):
+   ```toml
+   GEMINI_API_KEY = "your_gemini_api_key"
+   FRED_API_KEY = "your_fred_api_key"
+   ```
+6. Click **Deploy!**
+
+---
+
 ## 🚀 Quick Start
 
 ### 1. Prerequisites
