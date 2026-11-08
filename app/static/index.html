@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FRED + Gemini Economic Assistant</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <!-- Chart.js for interactive economic visualizations -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <!-- Marked for markdown formatting in chat bubbles -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.1/marked.min.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <!-- Sidebar / Indicator Drawer -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">📈</div>
+        <div class="brand-text">
+          <h1>FRED + Gemini</h1>
+          <span>Economic Intelligence</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-header">
+          <h3>Popular Indicators</h3>
+        </div>
+        <div class="indicator-chips" id="indicatorChips">
+          <!-- Populated dynamically -->
+          <div class="chip" data-query="What is the current CPI inflation rate and how has it trended over the past 2 years?">
+            <span class="chip-code">CPIAUCSL</span>
+            <span class="chip-desc">Headline CPI</span>
+          </div>
+          <div class="chip" data-query="Compare the 10-Year and 2-Year Treasury Yields and chart the yield curve spread.">
+            <span class="chip-code">T10Y2Y</span>
+            <span class="chip-desc">Yield Curve Spread</span>
+          </div>
+          <div class="chip" data-query="Show me the 30-Year Mortgage Rate compared to the Federal Funds Rate.">
+            <span class="chip-code">MORTGAGE30US</span>
+            <span class="chip-desc">30Y Mortgage vs Fed Rate</span>
+          </div>
+          <div class="chip" data-query="How has Real GDP growth evolved over the last 3 years?">
+            <span class="chip-code">GDPC1</span>
+            <span class="chip-desc">Real GDP</span>
+          </div>
+          <div class="chip" data-query="What is the current US unemployment rate and nonfarm payroll trajectory?">
+            <span class="chip-code">UNRATE</span>
+            <span class="chip-desc">Unemployment Rate</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="section-header">
+          <h3>Direct Tool API</h3>
+        </div>
+        <div class="api-links">
+          <a href="/docs" target="_blank" class="api-link">📚 Interactive Swagger API Docs</a>
+          <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" class="api-link">🔑 Get Free FRED API Key</a>
+          <a href="https://aistudio.google.com/" target="_blank" class="api-link">✨ Get Free Gemini API Key</a>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <button id="openSettingsBtn" class="secondary-btn settings-btn">
+          ⚙️ API Keys & Settings
+        </button>
+      </div>
+    </aside>
+
+    <!-- Main Chat Workspace -->
+    <main class="chat-main">
+      <header class="chat-header">
+        <div class="header-info">
+          <h2>Macroeconomic Chat Assistant</h2>
+          <div class="status-badges">
+            <span id="geminiStatusBadge" class="status-badge badge-warning">Gemini: Checking...</span>
+            <span id="fredStatusBadge" class="status-badge badge-warning">FRED: Checking...</span>
+            <span id="modelBadge" class="status-badge badge-info">gemini-2.5-flash</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="clearChatBtn" class="icon-btn" title="Clear Conversation">🗑️ Clear</button>
+        </div>
+      </header>
+
+      <!-- Message stream -->
+      <div class="chat-stream" id="chatStream">
+        <div class="message assistant-message welcome-message">
+          <div class="message-avatar">🏛️</div>
+          <div class="message-body">
+            <h3>Welcome to FRED + Gemini Economic Assistant</h3>
+            <p>I connect Google's <strong>Gemini</strong> generative AI directly to the <strong>Federal Reserve Economic Data (FRED) API</strong> via real-time tool calling.</p>
+            <p>You can ask me to fetch real-time macroeconomic indicators, track inflation, compare interest rates, analyze GDP, or chart multi-series economic cycles.</p>
+            <div class="welcome-suggestions">
+              <button class="suggestion-pill" data-query="What is the current US inflation rate and how has it changed over the past year?">📊 US Inflation (CPI) Analysis</button>
+              <button class="suggestion-pill" data-query="Chart 30-Year Mortgage Rate vs Fed Funds Rate over the last 3 years">🏠 Mortgage vs Fed Funds Rate</button>
+              <button class="suggestion-pill" data-query="What are the latest US Unemployment and Nonfarm Payroll numbers?">💼 Unemployment & Jobs</button>
+              <button class="suggestion-pill" data-query="Is the 10-Year vs 2-Year Treasury yield curve inverted right now?">📉 Treasury Yield Curve Spread</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chat input form -->
+      <footer class="chat-input-area">
+        <form id="chatForm" class="chat-form">
+          <textarea
+            id="chatInput"
+            placeholder="Ask about economic data (e.g., 'Chart CPI vs Core CPI over the past 3 years' or 'What is the Fed Funds Rate?')..."
+            rows="1"
+            required
+          ></textarea>
+          <button type="submit" id="sendBtn" class="send-btn" title="Send Prompt">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+            </svg>
+          </button>
+        </form>
+        <div class="input-helper">
+          Press <strong>Enter</strong> to send, <strong>Shift + Enter</strong> for a new line. Tools are called autonomously.
+        </div>
+      </footer>
+    </main>
+  </div>
+
+  <!-- Settings Modal Drawer -->
+  <div class="modal-backdrop" id="settingsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Configuration & API Keys</h3>
+        <button id="closeSettingsBtn" class="close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          Keys entered here are securely saved in your browser's local storage and used for queries. You can also configure them on the server via <code>.env</code>.
+        </p>
+
+        <div class="form-group">
+          <label for="geminiKeyInput">
+            Gemini API Key
+            <a href="https://aistudio.google.com/" target="_blank" class="field-link">Get Free Key</a>
+          </label>
+          <input type="password" id="geminiKeyInput" placeholder="AIzaSy..." autocomplete="off">
+          <span class="field-tip">Powers open-ended autonomous agent reasoning and tool orchestration.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="fredKeyInput">
+            St. Louis Fed (FRED) API Key
+            <a href="https://fred.stlouisfed.org/docs/api/api_key.html" target="_blank" class="field-link">Get Free Key</a>
+          </label>
+          <input type="password" id="fredKeyInput" placeholder="32-character hexadecimal key..." autocomplete="off">
+          <span class="field-tip">Required to fetch real-time live series from the 800,000+ FRED dataset.</span>
+        </div>
+
+        <div class="form-group">
+          <label for="modelSelect">Gemini Model</label>
+          <select id="modelSelect">
+            <option value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended - Fastest & Capable)</option>
+            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+            <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deepest Economic Reasoning)</option>
+            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <button id="testKeysBtn" class="secondary-btn">🔍 Test API Keys Connection</button>
+          <div id="testResultMsg" class="test-result-box hidden"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="saveSettingsBtn" class="primary-btn">Save Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

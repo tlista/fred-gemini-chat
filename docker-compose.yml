@@ -1,0 +1,18 @@
+services:
+  fred-gemini-chat:
+    build: .
+    container_name: fred-gemini-chat
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - FRED_API_KEY=${FRED_API_KEY:-}
+      - DEFAULT_GEMINI_MODEL=gemini-2.5-flash
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
